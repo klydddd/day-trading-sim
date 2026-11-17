@@ -59,4 +59,30 @@ describe('HTTP API', () => {
     ws.terminate();
     await app.close();
   });
+
+  it('refuses websocket connections from other sites (Origin check)', async () => {
+    const { app, manager } = await setup();
+    await app.ready();
+    const msgs: any[] = [];
+    let closed = false;
+    const ws = await app.injectWS('/ws', { headers: { origin: 'https://evil.example' } }, {
+      onInit: (w) => { w.on('message', (d) => msgs.push(String(d))); w.on('close', () => { closed = true; }); },
+    });
+    ws.send(JSON.stringify({ type: 'end_session' }));
+    for (let i = 0; i < 40 && !closed; i++) await new Promise((r) => setTimeout(r, 5));
+    expect(closed).toBe(true);
+    expect(msgs).toEqual([]);
+    expect(manager.handle).not.toHaveBeenCalled();
+    await app.close();
+  });
+  it('accepts the local dev origin', async () => {
+    const { app } = await setup();
+    await app.ready();
+    const msgs: any[] = [];
+    const ws = await app.injectWS('/ws', { headers: { origin: 'http://localhost:5173' } }, { onInit: (w) => w.on('message', (d) => msgs.push(String(d))) });
+    for (let i = 0; i < 40 && !msgs.length; i++) await new Promise((r) => setTimeout(r, 5));
+    expect(msgs.length).toBeGreaterThan(0);
+    ws.terminate();
+    await app.close();
+  });
 });

@@ -16,6 +16,17 @@ export class Hub {
   };
 }
 
+/** Browsers always send Origin; only pages served from this machine may drive the simulator. */
+export function isLocalOrigin(origin: string | undefined): boolean {
+  if (!origin) return true; // non-browser local client
+  try {
+    const { hostname } = new URL(origin);
+    return hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '[::1]' || hostname === '::1';
+  } catch {
+    return false;
+  }
+}
+
 export interface ManagerLike {
   handle(msg: import('../../shared/protocol').ClientMessage): Promise<void>;
   sync(): Promise<void>;
@@ -40,7 +51,11 @@ export async function buildApp(opts: {
 
   app.get<{ Params: { id: string } }>('/api/sessions/:id/trades', async (req) => opts.repo.sessionTrades(req.params.id));
 
-  app.get('/ws', { websocket: true }, (socket: WebSocket) => {
+  app.get('/ws', { websocket: true }, (socket: WebSocket, req) => {
+    if (!isLocalOrigin(req.headers.origin)) {
+      socket.close(1008, 'Origin not allowed');
+      return;
+    }
     const send = (m: ServerMessage) => socket.readyState === socket.OPEN && socket.send(JSON.stringify(m));
     opts.hub.clients.add(socket);
     socket.on('close', () => opts.hub.clients.delete(socket));
