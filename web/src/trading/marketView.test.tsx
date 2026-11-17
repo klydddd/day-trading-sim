@@ -59,3 +59,11 @@ describe('AccountBar', () => {
     expect(screen.getByText(/\$650 left before daily limit/)).toBeInTheDocument();
   });
 });
+
+import { QuotePanel } from './QuotePanel';
+describe('QuotePanel', () => {
+  it('shows a tight spread with enough precision to not read as zero', () => {
+    render(<QuotePanel symbol="SPY" quote={{ symbol: 'SPY', bid: 590.7, ask: 590.72, ts: 0 }} candles={[]} />);
+    expect(screen.getByText('$0.02 (0.003%)')).toBeInTheDocument();
+  });
+});

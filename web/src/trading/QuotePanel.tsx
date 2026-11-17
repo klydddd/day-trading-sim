@@ -18,7 +18,7 @@ export function QuotePanel({ symbol, quote, print, candles }: { symbol: string; 
     <div className="flex flex-wrap items-stretch divide-x divide-rule" aria-label={`${symbol} quote`} data-tour="quote">
       {cell(<Term id="bid">Bid</Term>, quote ? fmtUsd(quote.bid) : '–')}
       {cell(<Term id="ask">Ask</Term>, quote ? fmtUsd(quote.ask) : '–')}
-      {cell(<Term id="spread">Spread</Term>, spread !== undefined && mid ? `${fmtUsd(spread)} (${fmtPct(spread / mid, 2)})` : '–')}
+      {cell(<Term id="spread">Spread</Term>, spread !== undefined && mid ? `${fmtUsd(spread)} (${fmtPct(spread / mid, spread / mid < 0.0001 ? 3 : 2)})` : '–')}
       {cell(<Term id="last">Last</Term>, print ? fmtUsd(print.price) : '–')}
       {cell('Day high / low', hi !== undefined ? `${fmtUsd(hi!)} / ${fmtUsd(lo!)}` : '–')}
       {cell(<Term id="volume">Volume</Term>, vol ? vol.toLocaleString('en-US') : '–')}
