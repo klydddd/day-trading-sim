@@ -44,6 +44,11 @@ export class Engine {
     if (reason) return [this.reject(order, reason)];
 
     const events: EngineEvent[] = [this.update(order)];
+    if (order.side === 'buy' && order.bracket) events.push(...this.createChildren(order, now));
+    if (order.type === 'stop') {
+      const quote = this.quotes[order.symbol];
+      if (quote && quote.bid <= (order.stopPrice as number)) order.triggered = true; // already through: fills on next quote
+    }
     events.push(...this.tryImmediate(order, now));
     return events;
   }
@@ -153,6 +158,11 @@ export class Engine {
     }
     if (o.type === 'market' && !quote) return 'no_quote';
     const ref = o.type === 'market' ? quote!.ask : (o.limitPrice as number);
+    const b = o.bracket;
+    if (b) {
+      if (b.stopLoss !== undefined && !(b.stopLoss > 0 && b.stopLoss < ref)) return 'invalid_price';
+      if (b.takeProfit !== undefined && !(b.takeProfit > ref)) return 'invalid_price';
+    }
     if (o.qty * ref + this.fee(o.qty) > this.buyingPower(o.id) + 1e-9) return 'insufficient_cash';
     return undefined;
   }
@@ -168,9 +178,24 @@ export class Engine {
   }
 
   private cancelOrder(o: Order, now: number): EngineEvent[] {
-    void now;
     o.status = 'cancelled';
-    return [this.update(o)];
+    const events = [this.update(o)];
+    for (const child of this.orders) {
+      if (child.parentId === o.id && child.status === 'pending_parent') events.push(...this.cancelOrder(child, now));
+    }
+    return events;
+  }
+
+  /** Bracket: a stop-loss and a take-profit sell, one-cancels-other, activated when the parent fills. */
+  private createChildren(parent: Order, now: number): EngineEvent[] {
+    const b = parent.bracket!;
+    const ocoGroup = `oco-${parent.id}`;
+    const base = { symbol: parent.symbol, side: 'sell' as const, qty: parent.qty, status: 'pending_parent' as const, createdAt: now, parentId: parent.id, ocoGroup };
+    const kids: Order[] = [];
+    if (b.stopLoss !== undefined) kids.push({ ...base, id: this.idGen(), type: 'stop', stopPrice: b.stopLoss });
+    if (b.takeProfit !== undefined) kids.push({ ...base, id: this.idGen(), type: 'limit', limitPrice: b.takeProfit });
+    this.orders.push(...kids);
+    return kids.map((k) => this.update(k));
   }
 
   /** Fill at once if the order is market or marketable against the current quote. */
@@ -185,15 +210,35 @@ export class Engine {
     return [];
   }
 
+  /** Triggered stops fill on the next quote, at its bid (never at the stop price itself). */
   private onQuote(quote: Quote): EngineEvent[] {
-    void quote;
-    return [];
+    const events: EngineEvent[] = [];
+    for (const o of [...this.orders]) {
+      if (o.symbol !== quote.symbol || o.status !== 'working' || o.type !== 'stop' || !o.triggered) continue;
+      const stop = o.stopPrice as number;
+      const slippage = Math.max(0, roundCents(stop - quote.bid));
+      const filled = this.fill(o, quote.bid, quote.ts, { slippage });
+      events.push(...filled);
+      if (slippage > 0 && filled.some((e) => e.kind === 'fill')) {
+        events.push({ kind: 'note', note: { code: 'stop_slippage', ts: quote.ts, message:
+          `Your stop at ${fmtUsd(stop)} filled at ${fmtUsd(roundCents(quote.bid))} (${fmtUsd(slippage)} worse) because the price jumped past it. Stops limit losses but don't guarantee your price.` } });
+      }
+    }
+    return events;
   }
 
   private onPrint(pr: Print): EngineEvent[] {
     const events: EngineEvent[] = [];
     for (const o of [...this.orders]) {
-      if (o.symbol !== pr.symbol || o.status !== 'working' || o.type !== 'limit') continue;
+      if (o.symbol !== pr.symbol || o.status !== 'working') continue;
+      if (o.type === 'stop') {
+        if (!o.triggered && pr.price <= (o.stopPrice as number)) {
+          o.triggered = true;
+          events.push(this.update(o));
+        }
+        continue;
+      }
+      if (o.type !== 'limit') continue;
       const lim = o.limitPrice as number;
       const through = o.side === 'buy' ? pr.price < lim : pr.price > lim;
       if (through) {
@@ -240,6 +285,20 @@ export class Engine {
     const fill: Fill = { orderId: o.id, symbol: sym, side: o.side, qty, price, fee, ts };
     if (extra.slippage !== undefined) fill.slippage = extra.slippage;
     events.push({ kind: 'fill', fill });
+
+    if (o.side === 'buy') {
+      for (const child of this.orders) {
+        if (child.parentId === o.id && child.status === 'pending_parent') {
+          child.status = 'working';
+          events.push(this.update(child));
+        }
+      }
+    }
+    if (o.ocoGroup) {
+      for (const sib of this.orders) {
+        if (sib !== o && sib.ocoGroup === o.ocoGroup && isLive(sib)) events.push(...this.cancelOrder(sib, ts));
+      }
+    }
 
     if (o.side === 'sell' && this.positions[sym].qty === 0) {
       delete this.positions[sym];
