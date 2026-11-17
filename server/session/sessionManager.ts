@@ -213,6 +213,8 @@ export class SessionManager {
     if (!s) return;
     this.send(this.sessionMsg());
     this.sendAccount();
+    const fills = [...s.tracker.closed(), ...s.tracker.open()].flatMap((t) => t.fills).sort((a, b) => a.ts - b.ts);
+    for (const f of fills) this.send({ type: 'fill', fill: f }); // chart entry/exit markers after a refresh
     for (const t of s.tracker.closed()) this.send({ type: 'trade_closed', trade: t });
     if (this.replay) this.sendClock();
     for (const [sym, b] of Object.entries(this.builders)) this.send({ type: 'candles', symbol: sym, candles: b.all() });
@@ -485,10 +487,11 @@ export class SessionManager {
     }
   }
 
-  private flush() {
+  /** Send throttled updates whose window has passed; `force` (a user's +1 min step) sends the latest of each now. */
+  private flush(force = false) {
     const now = this.deps.now();
     for (const [key, m] of Object.entries(this.pending)) {
-      if (now - (this.lastSent[key] ?? -Infinity) >= PRICE_THROTTLE_MS) {
+      if (force || now - (this.lastSent[key] ?? -Infinity) >= PRICE_THROTTLE_MS) {
         this.lastSent[key] = now;
         delete this.pending[key];
         this.send(m);
@@ -547,7 +550,7 @@ export class SessionManager {
       this.advanceReplay();
       if (!this.s) return;
       this.persist();
-      this.flush();
+      this.flush(true);
     }
     this.lastLoop = this.deps.now();
     this.sendClock();

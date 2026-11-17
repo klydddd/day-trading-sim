@@ -23,6 +23,10 @@ describe('store reduce', () => {
     const s = apply([{ type: 'fill', fill: f }, { type: 'fill', fill: { ...f, ts: 6 } }]);
     expect(s.fills.map((x) => x.ts)).toEqual([5, 6]);
   });
+  it('a resent fill (same order, time and size) is not duplicated', () => {
+    const f = { orderId: 'a', symbol: 'SPY', side: 'buy' as const, qty: 1, price: 10, fee: 0, ts: 5 };
+    expect(apply([{ type: 'fill', fill: f }, { type: 'fill', fill: { ...f } }]).fills).toHaveLength(1);
+  });
   it('candle updates the last candle or appends a new minute', () => {
     const c = (t: number, c_: number) => ({ t, o: 1, h: 2, l: 0, c: c_, v: 1 });
     const s = apply([

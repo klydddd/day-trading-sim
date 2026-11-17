@@ -330,6 +330,16 @@ describe('SessionManager: replay loop and charts', () => {
     expect(c.candles.every((k) => k.t + 60000 <= simTs || k.t === Math.floor(simTs / 60000) * 60000)).toBe(true);
   });
 
+  it('after a +1 min step the browser gets the latest quote right away', async () => {
+    const h = harness();
+    const m = new SessionManager(h.deps);
+    await m.start(learnReplay());
+    await step(m);
+    const simTs = h.last('clock')!.simTs;
+    const spy = h.of('price').filter((p) => p.event.kind === 'quote' && p.event.quote.symbol === 'SPY').at(-1)!;
+    expect((spy.event as Extract<PriceEvent, { kind: 'quote' }>).quote.ts).toBe(simTs);
+  });
+
   it('throttles price messages to at most 4 per second per symbol and kind, flushing the latest', async () => {
     const h = harness({ isOpen: true });
     const m = new SessionManager(h.deps);
@@ -392,6 +402,7 @@ describe('SessionManager: restore (Review Focus #2)', () => {
     expect(h2.last('session')!).toMatchObject({ status: 'active', paused: true });
     expect(h2.last('clock')!).toMatchObject({ simTs, playing: false });
     expect(h2.of('trade_closed')).toHaveLength(1);
+    expect(h2.of('fill').map((f) => [f.fill.side, f.fill.qty])).toEqual([['buy', 10], ['sell', 10], ['buy', 5]]);
   });
 
   it('a live session restored after the market closed ends with market_close at the last bid', async () => {

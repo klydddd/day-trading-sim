@@ -67,7 +67,10 @@ export function reduce(s: AppState, m: ServerMessage): AppState {
       const orders = { ...s.orders, [m.order.id]: m.order };
       return { ...s, orders, lastReject: m.order.status === 'rejected' ? m.order : s.lastReject };
     }
-    case 'fill': return { ...s, fills: [...s.fills, m.fill] };
+    case 'fill': {
+      const dup = s.fills.some((f) => f.orderId === m.fill.orderId && f.ts === m.fill.ts && f.qty === m.fill.qty);
+      return dup ? s : { ...s, fills: [...s.fills, m.fill] };
+    }
     case 'trade_closed': return { ...s, trades: [...s.trades.filter((t) => t.id !== m.trade.id), m.trade] };
     case 'preview': return { ...s, preview: m.warnings };
     case 'warning': return { ...s, warnings: [...s.warnings, m.warning].slice(-6) };
