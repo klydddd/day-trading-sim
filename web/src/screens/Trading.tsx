@@ -8,7 +8,13 @@ import { QuotePanel } from '../trading/QuotePanel';
 import { AccountBar } from '../trading/AccountBar';
 import { Clock } from '../trading/Clock';
 import { ReplayControls } from '../trading/ReplayControls';
-import { DEFAULT_WATCHLIST } from '../../../shared/types';
+import { OrderTicket } from '../trading/OrderTicket';
+import { Positions } from '../trading/Positions';
+import { Orders } from '../trading/Orders';
+import { useTradingShortcuts } from '../trading/useTradingShortcuts';
+import { workingOrders } from '../store';
+import { useState } from 'react';
+import { DEFAULT_WATCHLIST, type Side } from '../../../shared/types';
 
 export function Trading() {
   const s = useStore();
@@ -24,6 +30,8 @@ export function Trading() {
   const orders = Object.values(s.orders);
   const ts = replay ? (s.clock?.simTs ?? now) : now;
   const phase = replay ? 'open' : (s.status?.market.phase ?? 'closed');
+  const [focusRequest, setFocusRequest] = useState<{ side: Side; n: number }>();
+  useTradingShortcuts({ send, symbol: selected, onFocusSide: (side) => setFocusRequest((f) => ({ side, n: (f?.n ?? 0) + 1 })) });
 
   return (
     <div className="flex h-full flex-col">
@@ -53,9 +61,16 @@ export function Trading() {
           <div className="panel min-h-[280px] flex-1 overflow-hidden">
             <Chart symbol={selected} candles={s.candles[selected] ?? []} fills={s.fills} orders={orders} hideDate={hideDate} />
           </div>
-          <div id="trading-bottom" />
+          <div className="grid grid-cols-2 gap-2">
+            <div className="panel"><Positions positions={Object.values(s.account?.state.positions ?? {})} prices={s.prices} onSend={send} /></div>
+            <div className="panel"><Orders orders={workingOrders(s.orders)} onSend={send} /></div>
+          </div>
         </section>
-        <aside id="trading-right" className="flex min-h-0 flex-col gap-2 overflow-y-auto" />
+        <aside className="flex min-h-0 flex-col gap-2 overflow-y-auto">
+          <OrderTicket key={selected} symbol={selected} quote={s.prices[selected]?.quote} startingCash={cfg.startingCash}
+            onSend={send} lastReject={s.lastReject} onDismissReject={s.clearReject} focusRequest={focusRequest} />
+          <p className="px-1 text-[11px] text-muted">Keys: B buy · S sell · C close {selected} · Shift+X cancel all</p>
+        </aside>
       </div>
     </div>
   );
