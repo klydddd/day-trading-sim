@@ -66,6 +66,11 @@ export class Repo {
     return rows.map((r) => JSON.parse(r.data) as Trade);
   }
 
+  getTrade(id: string): Trade | null {
+    const row = this.db.prepare('SELECT data FROM trades WHERE id = ?').get(id) as { data: string } | undefined;
+    return row ? (JSON.parse(row.data) as Trade) : null;
+  }
+
   getSession(id: string): SessionRow | null {
     return this.listSessions().find((s) => s.id === id) ?? null;
   }
