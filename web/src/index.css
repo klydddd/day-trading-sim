@@ -1,0 +1,37 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Public Sans", ui-sans-serif, system-ui, sans-serif;
+  --color-ink: #121925;
+  --color-panel: #19212f;
+  --color-raised: #212b3b;
+  --color-rule: #2a3546;
+  --color-text: #dce3ec;
+  --color-muted: #8a97aa;
+  --color-up: #3dbe8b;
+  --color-down: #ef6074;
+  --color-tutor: #f0b54a;      /* the Learn layer: explanations, terms, warnings */
+  --color-tutor-ink: #2a2110;
+  --color-focus: #7fb2ff;
+}
+
+@layer base {
+  html, body, #root { height: 100%; }
+  body { background: var(--color-ink); color: var(--color-text); font-family: var(--font-sans); font-size: 14px; line-height: 1.45; }
+  .num { font-variant-numeric: tabular-nums; }
+  :focus-visible { outline: 2px solid var(--color-focus); outline-offset: 2px; }
+  input, select, textarea { background: var(--color-ink); border: 1px solid var(--color-rule); border-radius: 4px; padding: 4px 8px; color: var(--color-text); }
+  input:disabled, button:disabled { opacity: .45; cursor: not-allowed; }
+  @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+}
+
+@layer components {
+  .btn { border: 1px solid var(--color-rule); background: var(--color-raised); border-radius: 4px; padding: 5px 12px; font-weight: 600; }
+  .btn:hover:not(:disabled) { border-color: var(--color-muted); }
+  .btn-primary { background: var(--color-text); color: var(--color-ink); border-color: var(--color-text); }
+  .btn-buy { background: var(--color-up); color: #06281b; border-color: var(--color-up); }
+  .btn-sell { background: var(--color-down); color: #2e0910; border-color: var(--color-down); }
+  .panel { background: var(--color-panel); border: 1px solid var(--color-rule); border-radius: 6px; }
+  .panel-title { font-size: 12px; font-weight: 600; color: var(--color-muted); padding: 6px 10px; border-bottom: 1px solid var(--color-rule); }
+  .tutor { background: color-mix(in oklab, var(--color-tutor) 12%, var(--color-panel)); border-left: 3px solid var(--color-tutor); color: var(--color-text); border-radius: 4px; }
+}
