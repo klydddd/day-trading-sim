@@ -30,6 +30,7 @@ export function AccountBar({ account, rules, startingCash, live, dataStatus }: {
       <dl className="flex flex-wrap items-baseline gap-x-5 gap-y-1 text-[13px]">
         <Item label={<Term id="cash">Cash</Term>}><span className="num">{fmtUsd(account?.state.cash ?? startingCash)}</span></Item>
         <Item label={<Term id="equity">Equity</Term>}><span className="num">{fmtUsd(account?.equity ?? startingCash)}</span></Item>
+        <Item label={<Term id="buyingPower">Buying power</Term>}><span className="num">{fmtUsd(account?.buyingPower ?? startingCash)}</span></Item>
         <Item label={<Term id="realizedPnl">Realized P&L</Term>}><Signed v={account?.state.realizedPnl ?? 0} /></Item>
         <Item label={<Term id="dailyLossLimit">Daily limit</Term>}>
           <span className={`num ${left < limit * 0.2 ? 'text-down font-semibold' : ''}`}>{fmtUsd(left, 0)} left before daily limit</span>

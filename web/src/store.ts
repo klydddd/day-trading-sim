@@ -87,6 +87,7 @@ interface Actions {
   clearReview(): void;
   clearReject(): void;
   clearError(): void;
+  clearDailyLimit(): void;
   setWalkthroughDone(): void;
 }
 
@@ -99,6 +100,7 @@ export const useStore = create<AppState & Actions>((set) => ({
   clearReview: () => set((s) => ({ ...sessionReset(s), session: undefined })),
   clearReject: () => set({ lastReject: undefined }),
   clearError: () => set({ lastError: undefined }),
+  clearDailyLimit: () => set({ dailyLimit: undefined }),
   setWalkthroughDone: () => set((s) => (s.status?.settings
     ? { status: { ...s.status, settings: { ...s.status.settings, walkthroughDone: true } } } : {})),
 }));

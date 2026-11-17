@@ -14,6 +14,13 @@ import { Orders } from '../trading/Orders';
 import { useTradingShortcuts } from '../trading/useTradingShortcuts';
 import { workingOrders } from '../store';
 import { useState } from 'react';
+import { PreTrade } from '../learn/PreTrade';
+import { Warnings } from '../learn/Warnings';
+import { EventNotes } from '../learn/EventNotes';
+import { DailyLimitDialog } from '../learn/DailyLimitDialog';
+import { Walkthrough } from '../learn/Walkthrough';
+import { Term } from '../learn/Term';
+import type { ClientMessage } from '../../../shared/protocol';
 import { DEFAULT_WATCHLIST, type Side } from '../../../shared/types';
 
 export function Trading() {
@@ -40,12 +47,15 @@ export function Trading() {
           <span className={`rounded px-2 py-0.5 text-[12px] font-bold ${learn ? 'bg-tutor text-tutor-ink' : 'bg-raised text-text'}`}>
             {learn ? 'Learn' : 'Challenge'}
           </span>
-          <span className="text-[12px] text-muted">{replay ? 'Replay' : 'Live'}{session.replayDate ? ` of ${session.replayDate}` : ''}</span>
+          <span className="text-[12px] text-muted">{replay ? `Replay${session.replayDate ? ` of ${session.replayDate}` : ''}` : <>Live, <Term id="iex">IEX</Term> data</>}</span>
         </div>
         <Clock ts={ts} phase={phase} showDate={!hideDate} />
         {replay && (
           <ReplayControls playing={s.clock?.playing ?? false} speed={s.clock?.speed ?? 1} locked={cfg.helpLevel === 'challenge'}
             onAction={(action, speed) => send({ type: 'replay_control', action, speed })} />
+        )}
+        {learn && s.dailyLimit === 'near' && (
+          <span className="tutor px-2 py-0.5 text-[12px]">You're close to your daily loss limit.</span>
         )}
         <div className="flex-1"><AccountBar account={s.account} rules={cfg.rules} startingCash={cfg.startingCash} live={!replay} dataStatus={s.status?.data ?? 'disconnected'} /></div>
         <button className="btn" onClick={() => send({ type: 'end_session' })}>End session</button>
@@ -68,10 +78,22 @@ export function Trading() {
         </section>
         <aside className="flex min-h-0 flex-col gap-2 overflow-y-auto">
           <OrderTicket key={selected} symbol={selected} quote={s.prices[selected]?.quote} startingCash={cfg.startingCash}
-            onSend={send} lastReject={s.lastReject} onDismissReject={s.clearReject} focusRequest={focusRequest} />
+            onSend={send} lastReject={s.lastReject} onDismissReject={s.clearReject} focusRequest={focusRequest}>
+            {(req) => req && (
+              <>
+                <PreTrade req={req} quote={s.prices[selected]?.quote} startingCash={cfg.startingCash} />
+                <Warnings warnings={s.preview} />
+              </>
+            )}
+          </OrderTicket>
           <p className="px-1 text-[11px] text-muted">Keys: B buy · S sell · C close {selected} · Shift+X cancel all</p>
         </aside>
       </div>
+      <EventNotes notes={s.notes} onDismiss={s.dismissNote} />
+      {learn && s.dailyLimit === 'paused' && (
+        <DailyLimitDialog onSend={(m: ClientMessage) => { send(m); if (m.type === 'override_daily_limit') s.clearDailyLimit(); }} />
+      )}
+      <Walkthrough done={s.status?.settings?.walkthroughDone ?? true} onSend={send} onDone={s.setWalkthroughDone} />
     </div>
   );
 }
